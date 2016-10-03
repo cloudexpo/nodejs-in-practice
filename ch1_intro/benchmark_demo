@@ -1,0 +1,16 @@
+var fs = require('fs');
+
+var benchmark_demo = function(file){
+	if(file && file.length){
+		console.log('Reading file: ' + file);
+		console.time('bench_label');//start benchmark
+		var fstream = fs.createReadStream(file);
+		fstream.on('end', ()=>{
+			console.timeEnd('bench_label');//end benchmark when no more data
+		});
+		fstream.pipe(process.stdout);//redirect to standard out
+	}
+
+};
+
+module.exports = benchmark_demo;

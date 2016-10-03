@@ -1,0 +1,15 @@
+{
+  "name": "ch1_intro",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node *_test.js"
+  },
+  "keywords": [
+    "demo"
+  ],
+  "author": "Meng Sun",
+  "license": "ISC"
+}

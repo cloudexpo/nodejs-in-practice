@@ -1,0 +1,14 @@
+{
+  "name": "ch2_modules",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "test": "node test.js"
+  },
+  "keywords": [
+    "demo"
+  ],
+  "author": "Meng Sun",
+  "license": "ISC"
+}

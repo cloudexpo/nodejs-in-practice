@@ -1,0 +1,19 @@
+{
+  "name": "ch3_buffer",
+  "version": "1.0.0",
+  "description": "buffer",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "mocha test/ --reporter mochawesome"
+  },
+  "dependencies": {
+    "mocha": "*",
+    "mochawesome": "*"
+  },
+  "keywords": [
+    "demo"
+  ],
+  "author": "Meng Sun",
+  "license": "ISC"
+}
