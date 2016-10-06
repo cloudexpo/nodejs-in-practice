@@ -4,7 +4,7 @@ var util = require('util');
 
 var path = require('path');
 var test_file_small = path.join(__dirname, 'test_data/small.txt');
-var test_file_large = path.join(__dirname, 'test_data/large.txt');
+// var test_file_large = path.join(__dirname, 'test_data/large.txt');
 
 
 /*function MyReader(options) {
