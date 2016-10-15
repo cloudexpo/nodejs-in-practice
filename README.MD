@@ -305,6 +305,102 @@ musicPlayer.on(e.play, function() {
 ```
 musicPlayer.listeners('play')
 ```
+
+#Chapter 5 Streams
+Streams are an event-based API for managing and modeling data, and are wonderfully efficient. By leveraging EventEmitter and Node’s non-blocking I/O libraries, the stream module allows data to be dynamically processed when it’s available, and then released when it’s no longer needed.  
+##Type of stream  
+
+| Name | User methods | Description |
+| ------------- | ------ | ------------------------ |
+| stream.Readable | _read(size) | Used for I/O sources that generate data |
+| stream.Writable | _write(chunk, encoding, callback) | Used to write to an underlying output destination |
+| stream.Duplex | _read(size), _write(chunk,encoding, callback) | A readable and writable stream,like a network connection |
+| stream.Transform | _flush(size), _transform(chunk, encoding, callback) | A duplex stream that changes data in some way, with no limitation on matching input data size with the output |
+
+##Built-in streams
+### fs
+
+#### old fashion
+
+```
+var http = require("http");
+var fs = require("fs");
+var url = require("url");
+var path = require("path");
+var zlib = require("zlib");
+//const querystring = require('querystring');
+
+const test_data_path = path.join(__dirname, '/test_data/');
+
+var routes = new Map();
+var register = function(url, fn) {
+    return routes.set(url, fn);
+};
+
+...
+//read file in normal way
+register('/test_non_stream', (test_file, req, resp) => {
+    fs.readFile(test_file, (err, data) => {
+        if (err) {
+            resp.statusCode = 500;
+            resp.end(String(err));
+        }
+        resp.end(data);
+    });
+
+});
+
+```
+
+#### read file as a stream
+
+```
+//read file as a stream
+register('/test_stream', (test_file, req, resp) => {
+    resp.writeHead(200, { 'Content-type': 'text/plain' });
+    fs.createReadStream(test_file).pipe(resp);
+});
+
+
+```
+
+Now instead of reading the entire file into memory, a buffer’s worth will be read at a time and sent to the client, which kind of imporoving efficiency
+
+#### pipe stream
+
+```
+//pipe stream
+register('/test_stream_zip', (test_file, req, resp) => {
+    resp.writeHead(200, { 'content-encoding': 'gzip' });
+    fs.createReadStream(test_file).pipe(zlib.createGzip()).pipe(resp);
+});
+
+```
+
+Not only read the file as stream, but also compress the file
+
+#### catch stream error
+when trying to open a non-exist file, 'error' event to be triggered. The error object passed to the handler    
+
+```
+
+/*Stream with error handler*/
+register('/test_stream_error', (non_exist_test_file, req, resp) => {
+    resp.writeHead(200, { 'Content-type': 'text/plain' });
+    var fstream = fs.createReadStream(non_exist_test_file);
+    fstream.pipe(resp);
+    fstream.on('error', err => {
+        resp.statusCode = 500;
+        resp.end(err.stack);//err object
+    });
+});
+
+```
+
+##custom stream
+
+
+
 #Unit Test
 The Test script name shold be the same as the source file following by .test.js    
 `describe` is a test suite     
