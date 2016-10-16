@@ -11,7 +11,7 @@ npm init
 ##2. how to write your own stream class
 ***Solution:***    
 Extends Stream class
-```
+```js
 var Writable = require("stream").Writable;
 var util = require("util");
 
@@ -36,13 +36,13 @@ CounterStream.prototype._write = function(chunk, encoding, cb) {
 ***Solution:***    
 module: `assert = require('assert')` usage: `assert.equal(count, 3094);`  
 add test script in `package.json`  
-```
+```js
 "scripts": {
     "test": "node test.js"
 },
 ```
 run test  
-```
+```js
 npm test  
 ```
 
@@ -60,7 +60,7 @@ npm test
 
 ####create and manage modules
 ***Solution:***        
-```
+```js
 //myclass.js    
 function MyClass() {    
 }    
@@ -74,7 +74,7 @@ module.exports = myClass;
 ```
 If you need to export multiple objects, values, methods, just attach them to `exports` 
 
-```
+```js
 //module-2.js
 ...
 exports.method = function() {
@@ -109,7 +109,7 @@ Create a file called index.js to load each module and export them as a group and
 >>>... 
 
 
-```
+```js
 //package.json
 { 
     "name" : "group",
@@ -142,7 +142,7 @@ Windows. e.g. `cat file.txt | node testprocess.js`
 ***Solution:***    
 Use `process.stdout` and `process.stdin`.
 
-```
+```js
 // Run with:
 // cat file.txt | node process.js
 process.stdin.resume();
@@ -168,7 +168,7 @@ String interpolation
 ***Solution:***
 Use `console.time()` and `console.timeEnd()`.
 
-```
+```js
 var benchmark_demo = function(file){
     if(file && file.length){
         console.log('Reading file: ' + file);
@@ -189,7 +189,7 @@ var benchmark_demo = function(file){
 Use `var assert = require('assert'); assert.equal(1, 1, '1 should equals 1');`
 
 #### Process object
-```
+```js
 console.log("arch: ", process.arch);
 console.log("platform: ", process.platform);
 console.log("argv: ", process.argv);//get command line arguments
@@ -211,7 +211,7 @@ Create fixed size buffer
 
 ##Inherits EventEmitter
 
-```
+```js
 var events = require('events');
 var util = require('util');
 
@@ -229,7 +229,7 @@ Sometimes you have an existing class and can’t easily rework it to inherit dir
 ***Solution:***
 Using a for-in loop is sufficient for copying the properties from one prototype to another. In this way you can copy the necessary properties from EventEmitter
 
-```
+```js
 var EventEmitter = require('events').EventEmitter;
 
 function MusicPlayer(track) {
@@ -248,7 +248,7 @@ musicPlayer.on('play', function() {
 
 ##register event and event handler
 one event can have multiple listeners, they will be called synchronously 
-```
+```js
 var musicPlayer = new MusicPlayer();
 
 function startPlayer(track) {
@@ -269,14 +269,14 @@ musicPlayer.on('stop', stopPlayer);
 ```
 
 ###remove event listener
-```
+```js
 musicPlayer.removeListener('play', getTitle); //remove listener from event, no more execution when event emitted
 
 ```
 
 ###error event
 
-```
+```js
 function errHandler(err) {
     console.log('something going wrong: ' + err);
 }
@@ -286,7 +286,7 @@ musicPlayer.on('error', errHandler);
 
 ###categorize your event names using an object
 For large project, avoid writing event as a string, Instead, an object can be used with properties that refer to the event name strings which can help people get a centralized list of event names.
-```
+```js
 var e = MusicPlayer.events = {
     play: 'play',
     pause: 'pause',
@@ -302,12 +302,12 @@ musicPlayer.on(e.play, function() {
 ```
 
 ###query listners attached to an event
-```
+```js
 musicPlayer.listeners('play')
 ```
 
 #Chapter 5 Streams
-Streams are an event-based API for managing and modeling data, and are wonderfully efficient. By leveraging EventEmitter and Node’s non-blocking I/O libraries, the stream module allows data to be dynamically processed when it’s available, and then released when it’s no longer needed.  
+Streams are an event-based API for managing and modeling data, and are wonderfully efficient. By leveraging EventEmitter and Node’s non-blocking I/O libraries, the stream module allows data to be dynamically processed(r,w,r&w,t) when it’s available, and then released when it’s no longer needed.  
 ##Type of stream  
 
 | Name | User methods | Description |
@@ -322,7 +322,7 @@ Streams are an event-based API for managing and modeling data, and are wonderful
 
 #### old fashion
 
-```
+```js
 var http = require("http");
 var fs = require("fs");
 var url = require("url");
@@ -354,21 +354,19 @@ register('/test_non_stream', (test_file, req, resp) => {
 
 #### read file as a stream
 
-```
+```js
 //read file as a stream
 register('/test_stream', (test_file, req, resp) => {
     resp.writeHead(200, { 'Content-type': 'text/plain' });
     fs.createReadStream(test_file).pipe(resp);
 });
-
-
 ```
 
 Now instead of reading the entire file into memory, a buffer’s worth will be read at a time and sent to the client, which kind of imporoving efficiency
 
 #### pipe stream
 
-```
+```js
 //pipe stream
 register('/test_stream_zip', (test_file, req, resp) => {
     resp.writeHead(200, { 'content-encoding': 'gzip' });
@@ -382,7 +380,7 @@ Not only read the file as stream, but also compress the file
 #### catch stream error
 when trying to open a non-exist file, 'error' event to be triggered. The error object passed to the handler    
 
-```
+```js
 
 /*Stream with error handler*/
 register('/test_stream_error', (non_exist_test_file, req, resp) => {
@@ -398,8 +396,103 @@ register('/test_stream_error', (non_exist_test_file, req, resp) => {
 ```
 
 ##custom stream
+###implements a read stream
+Extends `stream.Readable` and implements `_read()` method
+```js
+function MyReader(source) {
+    stream.Readable.call(this);
+    this.source = source;
+    this._buffer = "";
 
+    source.on('readable', function() {
+        this.read();
+    }.bind(this));
+}
+util.inherits(MyReader, stream.Readable);
 
+MyReader.prototype._read = function(size) {
+    var chunk;
+    var line;
+    var lineIndex;
+    if (this._buffer.length === 0) {
+        chunk = this.source.read();
+        this._buffer += chunk;
+    }
+    lineIndex = this._buffer.indexOf('\n');
+    if (lineIndex !== -1) {
+        line = this._buffer.slice(0, lineIndex);
+        this._buffer = this._buffer.slice(lineIndex + 1);
+        this.emit('newline', line);
+        this.push(line);
+    }
+};
+```
+###implements a write stream
+Extends `stream.Writable` and implements `_write()` method
+```js
+function MyWriter(options) {
+    stream.Writable.call(this, options)
+}
+MyWriter.prototype = Object.create(stream.Writable.prototype, {
+    constructor: {
+        value: MyWriter
+    }
+});
+MyWriter.prototype._write = function(chunk, encoding, callback) {
+    process.stdout.write('==>' + chunk);
+    callback();
+};
+```
+###Implements a duplex stream
+Inherit from `stream.Duplex` and implement `_read` and `_write` methods.
+```js
+function MyDuplex(options) {
+    stream.Duplex.call(this, options);
+    this.waiting = false;
+}
+
+MyDuplex.prototype = Object.create(stream.Duplex.prototype, {
+    constructor: {
+        value: MyDuplex
+    }
+});
+
+MyDuplex.prototype._read = function(size) {
+    if (!this.waiting) {
+        this.push('Feed me data >');
+        this.waiting = true;
+    }
+};
+
+MyDuplex.prototype._write = function(chunk, encoding, callback) {
+    this.waiting = false;
+    this.push(chunk);
+    callback();
+};
+```
+###Implements a transform stream
+To do tranformation with the stream data, inherit from `stream.Transform` and implement `_transform` method
+```js
+function MyTransform(options) {
+    stream.Transform.call(this, options);
+    this.value = '';
+    this.headers = [];
+    this.values = [];
+    this.line = 0;
+}
+
+MyTransform.prototype = Object.create(stream.Transform.prototype, {
+    constructor: {
+        value: MyTransform
+    }
+});
+
+MyTransform.prototype._transform = function(chunk, encoding, done) {
+    //do sth with chunk
+    this.push(transformedChunk);
+    done();
+};
+```
 
 #Unit Test
 The Test script name shold be the same as the source file following by .test.js    
@@ -408,7 +501,7 @@ The Test script name shold be the same as the source file following by .test.js
 ##Mocha
 
 example:
-```
+```js
 var describe = require('mocha').describe;
 var should = require('should');
 describe('buffer_demo_test', function() {
@@ -439,7 +532,7 @@ describe('buffer_demo_test', function() {
 ##Async function return undefined on invocation
 I totally stuck in the `undefined` value from async function call, what the hell. Here is my code snippet to defined a function to read file in async fashion and return the file content.
 
-```
+```js
 // i won't remove you, just keep the really bad case in mind
 function readFileAsBufferOld(file) {
     fs.readFile(file, (err, buf) => {
@@ -455,6 +548,6 @@ var file_content = readFileAsBuffer("small.txt");
 console.log(fiel_content);//really???!!!!!!!!!!, undefined
 
 
-``` 
+```
 
 >See this guy's post: http://cnodejs.org/topic/51b8811df78196a85c85dad3
