@@ -494,6 +494,193 @@ MyTransform.prototype._transform = function(chunk, encoding, done) {
 };
 ```
 
+#Chapter 6: File System-Sync & Async approaches to files
+
+##The `fs` module allows developer to interact with the file system by providing: 
+
+*   POSIX file I/O primitives 
+*   File streaming 
+*   Bulk file I/O 
+*   File watching 
+
+###POSIX file I/O wrappers
+provide equivalent wrappers for POSIX methods, such as chown, rename, rmdir, mkdir 
+
+| POSIX method | fs method | Description |
+| ------------- | ------ | ------------------------ |
+| rename(2) | fs.rename | Changes the name of a file |
+| truncate(2) | fs.truncate | Truncates or extends a file to a specified length |
+| ftruncate(2) | fs.ftruncate | Same as truncate but takes a file descriptor |
+| chown(2) | fs.chown | Changes file owner and group |
+| fchown(2) | fs.fchown | Same as chown but takes a file descriptor |
+| lchown(2) | fs.lchown | Same as chown but doesn’t follow symbolic links |
+| chmod(2) | fs.chmod | Changes file permissions |
+| fchmod(2) | fs.fchmod | Same as chmod but takes a file descriptor |
+| lchmod(2) | fs.lchmod | Same as chmod but doesn’t follow symbolic links |
+| stat(2) | fs.stat | Gets file status |
+| lstat(2) | fs.lstat | Same as stat but returns information about link if |
+| provided | rather | than what the link points to |
+| fstat(2) | fs.fstat | Same as stat but takes a file descriptor |
+| link(2) | fs.link | Makes a hard file link |
+| symlink(2) | fs.symlink | Makes a symbolic link to a file |
+| readlink(2) | fs.readlink | Reads value of a symbolic link |
+| realpath(2) | fs.realpath | Returns the canonicalized absolute pathname |
+| unlink(2) | fs.unlink | Removes directory entry |
+| rmdir(2) | fs.rmdir | Removes directory |
+| mkdir(2) | fs.mkdir | Makes directory |
+| readdir(2) | fs.readdir | Reads contents of a directory |
+| close(2) | fs.close | Deletes a file descriptor |
+| open(2) | fs.open | Opens or creates a file for reading or writing |
+| utimes(2) | fs.utimes | Sets file access and modification times |
+| futimes(2) | fs.futimes | Same as utimes but takes a file descriptor |
+| fsync(2) | fs.fsync | Synchronizes file data with disk |
+| write(2) | fs.write | Writes data to a file |
+| read(2) | fs.read | Reads data from a file |
+ 
+###streaming
+The fs module provides a streaming API with fs.createReadStream and fs.create-
+WriteStream. fs.createReadStream is a Readable stream, whereas fs.createWriteStream is a Writeable. see Chapter 5 streams
+
+#v#Bulk file I/O
+The bulk methods will load a file into memory or write one
+out completely in one shot
+
+###File watching
+watching/detecting whether files have changed with `fs.watch` and `fs.watchFile`. `fs.watch` uses the underlying operating system’s notifications, making it very efficient. But `fs.watch` can be finicky or simply not work on network drives. For those situations, the less-efficient `fs.watchFile` method, which uses stat polling, can be used.
+
+###Synchronous alternatives
+Synchronous methods are available for all the POSIX and bulk API calls.
+
+**Note:** As a general rule, synchronous methods should be used when first setting up your application, and not within a callback
+
+##File system techniques
+### File Descriptors
+File descriptors (FDs) are integers (indexes) associated with open files within a process managed by the operating system. As a process opens files, the operating system keeps track of these open files by assigning each a unique integer that it can then use to look up more information about the file.
+
+### File locking
+File locking is helpful when preventing mutiple processes from tampering the same file. Node has no built-in support for locking a file directly. 
+
+* But advisory locking of files can be done using syscalls such as flock. 
+* The `fs` module also provides and **x** flag for any methods that involve opening a file. This flag will flag the opened file as in exclusive mode(O_EXCL).
+* Exclusive mode may not work well if the lockfile exists on a network drive, since some systems don’t honor the O_EXCL flag on network drives. To circumvent this, another strategy is creating a lockfile as a directory. `mkdir` is an atomic operation (no races), has excellent cross-platform support, and works well with network drives
+
+##Use case
+###Loading configuration on startup
+When application starts up, configuration file should be loaded before everything that depends on the configurations. Comparing using asynchronous API and nesting everything that depends on the configuration in the callback, the synchronous API can avoid such nested code
+
+```js
+//load configuration using async approach
+//cons: all the work that depends on the config will have to nested the same callback, this can get ugly.
+fs.readFile(test_config, function(err, buf) {
+    if (err) throw err;
+    var config = JSON.parse(buf.toString());
+    init(config);
+})
+
+//load config using sync approach
+try {
+    var sync_config_raw = fs.readFileSync(test_config);
+    var sync_config = JSON.parse(sync_config_raw.toString());
+    init(sync_config);
+} catch (err) {
+    console.error(err);
+}
+
+```
+
+###locking
+File locking is helpful when cooperating processes need access to a common file
+where the integrity of the file is maintained and data isn’t lost. In this technique, we’ll explore how to write your own file locking module.
+
+```js
+var fs = require('fs');
+
+function MyLock() {
+    this.locking = false;//lock status
+}
+
+MyLock.prototype.lockDir = 'config.lock';
+
+MyLock.prototype.lock = function(cb) {
+    var me = this;//Note: pay attention to this in callback, try to remove this line
+    if (me.locking) return cb();
+    fs.mkdir(me.lockDir, function(err) {
+        if (err) return cb(err);
+        fs.writeFile(me.lockDir + '/' + process.pid, function(err) {
+            if (err) return cb(err);
+            me.locking = true;
+            cb();
+        });
+    });
+};
+
+MyLock.prototype.unlock = function(cb) {
+    var me = this;
+    if (!me.locking) return cb();
+    fs.unlink(me.lockDir, function(err) {
+        if (err) return cb(err);
+        fs.rmdir(me.lockDir, function(err) {
+            if (err) return cb();
+            me.locking = false;
+            cb();
+        });
+    });
+};
+
+module.exports = MyLock;
+```
+
+###Recursive file operations
+Recursive file operations are helpful and hard to get right, especially when done asynchronously. But understanding how to perform them is a good exercise in mastering evented programming with Node. In this technique, we’ll dive into recursive file operations by creating a module for searching a directory tree
+
+```js
+function find(pattern, startpath, cb) {
+    var results = [];
+    var asyncOps = 0;
+    var errored = false;
+
+    function error(err) {
+        if (!errored) {
+            cb(err);
+        }
+        errored = true;
+    };
+    console.log('start searching...');
+
+    function finder(startpath) {
+        asyncOps++; //current folder
+
+        fs.readdir(startpath, function(err, items) {
+            if (err) {
+                return error(err);
+            }
+            items.forEach(function(item) {
+                var fpath = path.join(startpath, item);
+                asyncOps++;
+                fs.stat(fpath, function(err, stats) {
+                    if (err) {
+                        return error(err);
+                    }
+                    if (stats.isDirectory()) {
+                        finder(fpath);
+                    } else if (stats.isFile() && pattern.test(fpath)) {
+                        results.push(fpath);
+                    }
+                    asyncOps--;
+                    if (asyncOps == 0) {
+                        cb(null, results);
+                    }
+                });
+            });
+        });
+    }
+    finder(startpath);
+}
+```
+
+
+
+
 #Unit Test
 The Test script name shold be the same as the source file following by .test.js    
 `describe` is a test suite     
